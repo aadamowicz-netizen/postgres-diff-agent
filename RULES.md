@@ -25,6 +25,8 @@ row per difference with `status = 'observed'`. Query them through
 | `change` | added, removed, changed |
 | `before`, `after` | the definition text on each side (NULL for added/removed respectively) |
 | `status` | `observed` = a change; `snapshot` = raw state at that run |
+| `source` | settings only: where the value came from (default, database, user, configuration file) |
+| `table_name` | columns, indexes, constraints only: the table they belong to (schema-qualified) |
 
 Every drift change row must be filtered with `status = 'observed'`; snapshot
 rows share `run_ts` and `object_name` and are the raw state, not changes.
@@ -53,7 +55,7 @@ Map the user's words to `kind`:
 |---|---|
 | config, configuration, setting, parameter, GUC | `setting` (mention `extension` too if versions changed) |
 | schema, DDL, structure | `table`, `column`, `index`, `constraint`, `view`, `function`, `sequence` |
-| table X | everything whose name or `metrics->>'table'` mentions X: its columns, indexes, constraints, grants, and views/functions whose definition text contains X |
+| table X | `object_name ILIKE '%X%'` OR `table_name ILIKE '%X%'` OR (`kind IN ('view','function')` AND (`before` or `after` `ILIKE '%X%'`)) — this catches the table itself, its columns, indexes, constraints (including FKs on other tables that reference it only if their definition text names X), grants, and views/functions that use it |
 | permissions, access, security, grants, roles | `grant`, `role` |
 | index / indexes | `index` (and `constraint` for primary/unique keys) |
 | extension, plugin | `extension` |

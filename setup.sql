@@ -37,7 +37,8 @@ SELECT run_ts, object_name, status,
        metrics->>'before'                                  AS before,
        COALESCE(metrics->>'after', metrics->>'definition') AS after,
        (metrics->>'previous_run')::timestamptz             AS previous_run,
-       metrics->>'source'                                  AS source
+       metrics->>'source'                                  AS source,      -- settings: default/database/user/configuration file
+       metrics->>'table'                                   AS table_name   -- columns, indexes, constraints: owning table
 FROM agent.agent_findings
 WHERE domain = 'drift';
 
