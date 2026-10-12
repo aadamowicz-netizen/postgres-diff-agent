@@ -55,7 +55,7 @@ Map the user's words to `kind`:
 |---|---|
 | config, configuration, setting, parameter, GUC | `setting` (mention `extension` too if versions changed) |
 | schema, DDL, structure | `table`, `column`, `index`, `constraint`, `view`, `function`, `sequence` |
-| table X | `object_name ILIKE '%X%'` OR `table_name ILIKE '%X%'` OR (`kind IN ('view','function')` AND (`before` or `after` `ILIKE '%X%'`)) — this catches the table itself, its columns, indexes, constraints (including FKs on other tables that reference it only if their definition text names X), grants, and views/functions that use it |
+| table X | `object_name ILIKE '%X%'` OR `table_name ILIKE '%X%'` OR (`kind IN ('view','function','constraint')` AND (`before ILIKE '%X%'` OR `after ILIKE '%X%'`)) — this catches the table itself, its columns, indexes, constraints, grants, foreign keys on *other* tables that reference X (their definition text says `REFERENCES X`), and views/functions that use it |
 | permissions, access, security, grants, roles | `grant`, `role` |
 | index / indexes | `index` (and `constraint` for primary/unique keys) |
 | extension, plugin | `extension` |
