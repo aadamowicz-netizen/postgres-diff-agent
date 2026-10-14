@@ -4,7 +4,7 @@
 -- and no elevated privileges beyond SELECT on the objects it describes.
 --
 -- Object naming (object_name):
---   setting:<name>                     extension:<name>
+--   setting:<name>                     dbsetting:<db>:<role>:<name>   extension:<name>
 --   table:<schema>.<table>             column:<schema>.<table>.<column>
 --   index:<schema>.<index>             constraint:<schema>.<table>.<constraint>
 --   view:<schema>.<view>               function:<schema>.<name>(<args>)
@@ -25,6 +25,19 @@ settings AS (
              AND split_part(name, '.', 1) NOT IN
                  (SELECT trim(unnest(string_to_array(current_setting('shared_preload_libraries'), ','))))
             )
+),
+-- Database- and role-level overrides (ALTER DATABASE/ROLE ... SET), read from the
+-- catalog so they are visible immediately, independent of this session or any
+-- connection pooler. pg_settings above only shows this session's effective values.
+db_role_settings AS (
+  SELECT 'dbsetting:' || COALESCE(d.datname, '*') || ':' || COALESCE(r.rolname, '*') || ':' || split_part(cfg, '=', 1),
+         'dbsetting',
+         substr(cfg, strpos(cfg, '=') + 1),
+         jsonb_build_object('database', d.datname, 'role', r.rolname, 'source', CASE WHEN r.rolname IS NULL THEN 'database' ELSE 'user' END)
+  FROM pg_db_role_setting s
+  LEFT JOIN pg_database d ON d.oid = s.setdatabase
+  LEFT JOIN pg_roles    r ON r.oid = s.setrole
+  CROSS JOIN LATERAL unnest(s.setconfig) AS cfg
 ),
 extensions AS (
   SELECT 'extension:' || extname, 'extension', extversion, '{}'::jsonb
@@ -107,7 +120,7 @@ grants AS (
   GROUP BY table_schema, table_name, grantee
 ),
 all_objects AS (
-  SELECT * FROM settings   UNION ALL SELECT * FROM extensions UNION ALL SELECT * FROM tables
+  SELECT * FROM settings   UNION ALL SELECT * FROM db_role_settings UNION ALL SELECT * FROM extensions UNION ALL SELECT * FROM tables
   UNION ALL SELECT * FROM columns  UNION ALL SELECT * FROM indexes  UNION ALL SELECT * FROM constraints
   UNION ALL SELECT * FROM views    UNION ALL SELECT * FROM functions UNION ALL SELECT * FROM sequences
   UNION ALL SELECT * FROM roles    UNION ALL SELECT * FROM grants
