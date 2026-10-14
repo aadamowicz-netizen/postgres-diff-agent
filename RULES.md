@@ -21,7 +21,7 @@ row per difference with `status = 'observed'`. Query them through
 | `run_ts` | when the change was **detected** (the snapshot that first saw it) |
 | `previous_run` | the last snapshot that did **not** have it — the change happened between these two |
 | `object_name` | `<kind>:<qualified name>`, e.g. `setting:work_mem`, `index:doadmin.orders_pkey`, `grant:doadmin.orders:PUBLIC` |
-| `kind` | setting, extension, table, column, index, constraint, view, function, sequence, role, grant |
+| `kind` | setting, dbsetting, extension, table, column, index, constraint, view, function, sequence, role, grant |
 | `change` | added, removed, changed |
 | `before`, `after` | the definition text on each side (NULL for added/removed respectively) |
 | `status` | `observed` = a change; `snapshot` = raw state at that run |
@@ -38,10 +38,13 @@ rows share `run_ts` and `object_name` and are the raw state, not changes.
    window, never a point in time, unless the window is under a few minutes.
 2. **You cannot see who made a change.** Say so when asked. Point to
    `pgaudit` server logs if the user has access to them.
-3. **Settings are as seen by the collector's session.** `ALTER DATABASE ...
-   SET` / `ALTER ROLE ... SET` show up only when the collector connects fresh.
-   A `setting` change with `source = 'database'` or `'user'` in the snapshot
-   metrics means it was set that way, not in the server config file.
+3. **Two kinds of setting.** `setting:` rows come from `pg_settings` — the
+   collector's own session's effective values, which reflect server config
+   and may lag behind database/role overrides when a connection pooler reuses
+   backends. `dbsetting:<database>:<role>:<name>` rows come from
+   `pg_db_role_setting` — `ALTER DATABASE ... SET` and `ALTER ROLE ... SET`
+   overrides read from the catalog, visible immediately. For any parameter
+   question check both kinds and say which one changed.
 4. **Only what the collector can see.** Objects in schemas the collector
    cannot read, and other databases on the cluster, are not covered.
 5. **No snapshot, no history.** If the earliest snapshot is after the time
@@ -53,7 +56,7 @@ Map the user's words to `kind`:
 
 | user says | kinds |
 |---|---|
-| config, configuration, setting, parameter, GUC | `setting` (mention `extension` too if versions changed) |
+| config, configuration, setting, parameter, GUC | `setting` and `dbsetting` (mention `extension` too if versions changed) |
 | schema, DDL, structure | `table`, `column`, `index`, `constraint`, `view`, `function`, `sequence` |
 | table X | `object_name ILIKE '%X%'` OR `table_name ILIKE '%X%'` OR (`kind IN ('view','function','constraint')` AND (`before ILIKE '%X%'` OR `after ILIKE '%X%'`)) — this catches the table itself, its columns, indexes, constraints, grants, foreign keys on *other* tables that reference X (their definition text says `REFERENCES X`), and views/functions that use it |
 | permissions, access, security, grants, roles | `grant`, `role` |
